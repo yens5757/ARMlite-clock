@@ -1,0 +1,551 @@
+/Instruction: A is for stop, S is for split, R is for Reset, You can't split or reset when you are in the stop state.
+/The running time is in the middle, while the split time is below it, indicated with an S on the side
+/Only r0-r3 and lr are poped and pushed throughout the program
+start:                  /setup the interrupt and draw the base of the stopwatch
+      mov r10, #splitData
+      bl drawBase
+      MOV R8,#1
+      STR R8,.InterruptRegister
+      MOV R8,#1000
+      STR R8,.ClockInterruptFrequency
+      MOV R8, #checkinput
+      STR R8, .KeyboardISR
+      MOV R8,#1
+      STR R8, .KeyboardMask
+      mov r0, #1        /delay=1s
+reset:                  /this is the four digit of the clock 
+      mov r4, #0 
+      mov r5, #0 
+      mov r6, #0 
+      mov r7, #0
+      bl resetSplit
+setClockInterrupt:      /reset the clock interrupt
+      bl resetClockInterrupt
+loop:                   /loop the timer if it isn't 1 second yet
+      b loop 
+addTime:
+      add r4, r4, #1
+      cmp r4, #10
+      beq addSecondDigit
+timeOutput:             /output clock and draw the clock
+      str r7, .WriteUnsignedNum 
+      str r6, .WriteUnsignedNum 
+      str r5, .WriteUnsignedNum 
+      str r4, .WriteUnsignedNum
+      mov r3, #1240     /offset for drawing pixel for running clock
+      bl drawTime 
+      halt
+stopped: .ASCIZ "\nStopwatch stopped, enter A to resume.\n"
+reseted: .ASCIZ "\nStopwatch reseted.\n"
+storeSplit:             /array for storing the split time
+      .ALIGN 256
+splitData: 0 
+      0
+      0
+      0
+drawBase:               /this draws the base of the first second(00:00)
+      PUSH {lr}
+      mov r0, #.black
+      str r0, .Pixel336
+      str r0, .Pixel400
+      str r0, .Pixel514
+      str r0, .Pixel545
+      str r0, .Pixel547
+      str r0, .Pixel577
+      str r0, .Pixel610
+      str r0, .Pixel643
+      str r0, .Pixel673
+      str r0, .Pixel675
+      str r0, .Pixel706
+      str r0, .Pixel592
+      str r0, .Pixel656
+      mov r0, #.black
+      mov r1, #.white
+      mov r2, #.Pixel0
+      mov r3, #1240
+      bl draw0
+      mov r3, #1224
+      bl draw0
+      mov r3, #1200
+      bl draw0
+      mov r3, #1184
+      bl draw0
+      mov r3, #2264
+      bl draw0
+      mov r3, #2248
+      bl draw0
+      mov r3, #2224
+      bl draw0
+      mov r3, #2208
+      bl draw0
+      POP {lr}
+      ret
+addSecondDigit:         /add 1 to second digit and check if it's 60 second already
+      mov lr, #timeOutput
+      add r5, r5, #1
+      mov r4, #0
+      cmp r5, #6
+      beq addThirdDigit
+      ret
+addThirdDigit:          /add 1 to minute and check if it's 10 minutes already
+      add r6, r6, #1
+      mov r5, #0
+      cmp r6, #10
+      beq addFourthDigit
+      ret
+addFourthDigit:         /add 1 to fourth digit
+      add r7, r7, #1
+      mov r6, #0
+      ret
+drawTime: 
+      PUSH {r0, r1, r2} /PUSH{r3} is in actual draw number
+      mov r0, #.black
+      mov r1, #.white
+      mov r2, #.Pixel0
+startdrawFirstDigit:
+      mov lr, #drawSecondDigit
+      cmp r4, #0
+      beq draw0
+      cmp r4, #1
+      beq draw1
+      cmp r4, #2
+      beq draw2
+      cmp r4, #3
+      beq draw3
+      cmp r4, #4
+      beq draw4
+      cmp r4, #5
+      beq draw5
+      cmp r4, #6
+      beq draw6
+      cmp r4, #7
+      beq draw7
+      cmp r4, #8
+      beq draw8
+      b draw9
+drawSecondDigit:
+      sub r3, r3, #16
+      mov lr, #drawThirdDigit
+      cmp r5, #0
+      beq draw0
+      cmp r5, #1
+      beq draw1
+      cmp r5, #2
+      beq draw2
+      cmp r5, #3
+      beq draw3
+      cmp r5, #4
+      beq draw4
+      cmp r5, #5
+      beq draw5
+      cmp r5, #6
+      beq draw6
+      cmp r5, #7
+      beq draw7
+      cmp r5, #8
+      beq draw8
+      b draw9
+drawThirdDigit:
+      sub r3, r3, #24
+      mov lr, #drawFourthDigit
+      cmp r6, #0
+      beq draw0
+      cmp r6, #1
+      beq draw1
+      cmp r6, #2
+      beq draw2
+      cmp r6, #3
+      beq draw3
+      cmp r6, #4
+      beq draw4
+      cmp r6, #5
+      beq draw5
+      cmp r6, #6
+      beq draw6
+      cmp r6, #7
+      beq draw7
+      cmp r6, #8
+      beq draw8
+      b draw9
+drawFourthDigit:
+      sub r3, r3, #16
+      mov lr, #drawFinished
+      cmp r7, #0
+      beq draw0
+      cmp r7, #1
+      beq draw1
+      cmp r7, #2
+      beq draw2
+      cmp r7, #3
+      beq draw3
+      cmp r7, #4
+      beq draw4
+      cmp r7, #5
+      beq draw5
+      cmp r7, #6
+      beq draw6
+      cmp r7, #7
+      beq draw7
+      cmp r7, #8
+      beq draw8
+      b draw9
+drawFinished:
+      mov lr, #loop
+      POP {r0, r1, r2}
+      rfe
+draw0:
+      PUSH {lr, r3}     /save lr and the offset of the pixel first   
+      bl erasePixel
+      POP {lr, r3}      /change the lr and offset back so that the draw won't be effected
+      PUSH {r3}
+      str r0, [r2+r3]
+      add r3, r3, #4
+      str r0, [r2+r3]
+      add r3, r3, #4
+      str r0, [r2+r3]
+      add r3, r3, #120
+      str r0, [r2+r3]
+      add r3, r3, #8
+      str r0, [r2+r3]
+      add r3, r3, #120
+      str r0, [r2+r3]
+      add r3, r3, #8
+      str r0, [r2+r3]
+      add r3, r3, #120
+      str r0, [r2+r3]
+      add r3, r3, #8
+      str r0, [r2+r3]
+      add r3, r3, #120
+      str r0, [r2+r3]
+      add r3, r3, #4
+      str r0, [r2+r3]
+      add r3, r3, #4
+      str r0, [r2+r3]
+      POP {r3}
+      ret
+draw1:
+      PUSH {lr, r3}     /save lr and the offset of the pixel first  
+      bl erasePixel
+      POP {lr, r3}      /change the lr and offset back so that the draw won't be effected
+      PUSH {r3}
+      add r3, r3, #4
+      str r0, [r2+r3]
+      add r3, r3, #124
+      str r0, [r2+r3]
+      add r3, r3, #4
+      str r0, [r2+r3]
+      add r3, r3, #128
+      str r0, [r2+r3]
+      add r3, r3, #128
+      str r0, [r2+r3]
+      add r3, r3, #124
+      str r0, [r2+r3]
+      add r3, r3, #4
+      str r0, [r2+r3]
+      add r3, r3, #4
+      str r0, [r2+r3]
+      POP {r3}
+      ret
+draw2:
+      PUSH {lr, r3}     /save lr and the offset of the pixel first   
+      bl erasePixel
+      POP {lr, r3}      /change the lr and offset back so that the draw won't be effected
+      PUSH {r3}
+      str r0, [r2+r3]
+      add r3, r3, #4
+      str r0, [r2+r3]
+      add r3, r3, #4
+      str r0, [r2+r3]
+      add r3, r3, #128
+      str r0, [r2+r3]
+      add r3, r3, #120
+      str r0, [r2+r3]
+      add r3, r3, #4
+      str r0, [r2+r3]
+      add r3, r3, #4
+      str r0, [r2+r3]
+      add r3, r3, #120
+      str r0, [r2+r3]
+      add r3, r3, #128
+      str r0, [r2+r3]
+      add r3, r3, #4
+      str r0, [r2+r3]
+      add r3, r3, #4
+      str r0, [r2+r3]
+      POP {r3}
+      ret
+draw3:
+      PUSH {lr, r3}     /save lr and the offset of the pixel first   
+      bl erasePixel
+      POP {lr, r3}      /change the lr and offset back so that the draw won't be effected
+      PUSH {r3}
+      str r0, [r2+r3]
+      add r3, r3, #4
+      str r0, [r2+r3]
+      add r3, r3, #4
+      str r0, [r2+r3]
+      add r3, r3, #128
+      str r0, [r2+r3]
+      add r3, r3, #120
+      str r0, [r2+r3]
+      add r3, r3, #4
+      str r0, [r2+r3]
+      add r3, r3, #4
+      str r0, [r2+r3]
+      add r3, r3, #128
+      str r0, [r2+r3]
+      add r3, r3, #120
+      str r0, [r2+r3]
+      add r3, r3, #4
+      str r0, [r2+r3]
+      add r3, r3, #4
+      str r0, [r2+r3]
+      POP {r3}
+      ret
+draw4:
+      PUSH {lr, r3}     /save lr and the offset of the pixel first   
+      bl erasePixel
+      POP {lr, r3}      /change the lr and offset back so that the draw won't be effected
+      PUSH {r3}
+      str r0, [r2+r3]
+      add r3, r3, #8
+      str r0, [r2+r3]
+      add r3, r3, #120
+      str r0, [r2+r3]
+      add r3, r3, #8
+      str r0, [r2+r3]
+      add r3, r3, #120
+      str r0, [r2+r3]
+      add r3, r3, #4
+      str r0, [r2+r3]
+      add r3, r3, #4
+      str r0, [r2+r3]
+      add r3, r3, #128
+      str r0, [r2+r3]
+      add r3, r3, #128
+      str r0, [r2+r3]
+      POP {r3}
+      ret
+draw5:
+      PUSH {lr, r3}     /save lr and the offset of the pixel first  
+      bl erasePixel
+      POP {lr, r3}      /change the lr and offset back so that the draw won't be effected
+      PUSH {r3}
+      str r0, [r2+r3]
+      add r3, r3, #4
+      str r0, [r2+r3]
+      add r3, r3, #4
+      str r0, [r2+r3]
+      add r3, r3, #120
+      str r0, [r2+r3]
+      add r3, r3, #128
+      str r0, [r2+r3]
+      add r3, r3, #4
+      str r0, [r2+r3]
+      add r3, r3, #4
+      str r0, [r2+r3]
+      add r3, r3, #128
+      str r0, [r2+r3]
+      add r3, r3, #120
+      str r0, [r2+r3]
+      add r3, r3, #4
+      str r0, [r2+r3]
+      add r3, r3, #4
+      str r0, [r2+r3]
+      POP {r3}
+      ret
+draw6:
+      PUSH {lr, r3}     /save lr and the offset of the pixel first  
+      bl erasePixel
+      POP {lr, r3}      /change the lr and offset back so that the draw won't be effected
+      PUSH {r3}
+      str r0, [r2+r3]
+      add r3, r3, #4
+      str r0, [r2+r3]
+      add r3, r3, #4
+      str r0, [r2+r3]
+      add r3, r3, #120
+      str r0, [r2+r3]
+      add r3, r3, #128
+      str r0, [r2+r3]
+      add r3, r3, #4
+      str r0, [r2+r3]
+      add r3, r3, #4
+      str r0, [r2+r3]
+      add r3, r3, #120
+      str r0, [r2+r3]
+      add r3, r3, #8
+      str r0, [r2+r3]
+      add r3, r3, #120
+      str r0, [r2+r3]
+      add r3, r3, #4
+      str r0, [r2+r3]
+      add r3, r3, #4
+      str r0, [r2+r3]
+      POP {r3}
+      ret
+draw7:
+      PUSH {lr, r3}     /save lr and the offset of the pixel first   
+      bl erasePixel
+      POP {lr, r3}      /change the lr and offset back so that the draw won't be effected
+      PUSH {r3}
+      str r0, [r2+r3]
+      add r3, r3, #4
+      str r0, [r2+r3]
+      add r3, r3, #4
+      str r0, [r2+r3]
+      add r3, r3, #128
+      str r0, [r2+r3]
+      add r3, r3, #128
+      str r0, [r2+r3]
+      add r3, r3, #128
+      str r0, [r2+r3]
+      add r3, r3, #128
+      str r0, [r2+r3]
+      POP {r3}
+      ret
+draw8:
+      PUSH {lr, r3}     /save lr and the offset of the pixel first   
+      bl erasePixel
+      POP {lr, r3}      /change the lr and offset back so that the draw won't be effected
+      PUSH {r3}
+      str r0, [r2+r3]
+      add r3, r3, #4
+      str r0, [r2+r3]
+      add r3, r3, #4
+      str r0, [r2+r3]
+      add r3, r3, #120
+      str r0, [r2+r3]
+      add r3, r3, #8
+      str r0, [r2+r3]
+      add r3, r3, #120
+      str r0, [r2+r3]
+      add r3, r3, #4
+      str r0, [r2+r3]
+      add r3, r3, #4
+      str r0, [r2+r3]
+      add r3, r3, #120
+      str r0, [r2+r3]
+      add r3, r3, #8
+      str r0, [r2+r3]
+      add r3, r3, #120
+      str r0, [r2+r3]
+      add r3, r3, #4
+      str r0, [r2+r3]
+      add r3, r3, #4
+      str r0, [r2+r3]
+      POP {r3}
+      ret
+draw9:
+      PUSH {lr, r3}     /save lr and the offset of the pixel first   
+      bl erasePixel
+      POP {lr, r3}      /change the lr and offset back so that the draw won't be effected
+      PUSH {r3}
+      str r0, [r2+r3]
+      add r3, r3, #4
+      str r0, [r2+r3]
+      add r3, r3, #4
+      str r0, [r2+r3]
+      add r3, r3, #120
+      str r0, [r2+r3]
+      add r3, r3, #8
+      str r0, [r2+r3]
+      add r3, r3, #120
+      str r0, [r2+r3]
+      add r3, r3, #4
+      str r0, [r2+r3]
+      add r3, r3, #4
+      str r0, [r2+r3]
+      add r3, r3, #128
+      str r0, [r2+r3]
+      add r3, r3, #128
+      str r0, [r2+r3]
+      POP {r3}
+      ret
+erasePixel:             /this is for erase the pixel drawn
+      str r1, [r2+r3]
+      add r3, r3, #4
+      str r1, [r2+r3]
+      add r3, r3, #4
+      str r1, [r2+r3]
+      add r3, r3, #120
+      str r1, [r2+r3]
+      add r3, r3, #4
+      str r1, [r2+r3]
+      add r3, r3, #4
+      str r1, [r2+r3]
+      add r3, r3, #120
+      str r1, [r2+r3]
+      add r3, r3, #4
+      str r1, [r2+r3]
+      add r3, r3, #4
+      str r1, [r2+r3]
+      add r3, r3, #120
+      str r1, [r2+r3]
+      add r3, r3, #4
+      str r1, [r2+r3]
+      add r3, r3, #4
+      str r1, [r2+r3]
+      add r3, r3, #120
+      str r1, [r2+r3]
+      add r3, r3, #4
+      str r1, [r2+r3]
+      add r3, r3, #4
+      str r1, [r2+r3]
+      ret
+checkinput:
+      ldr r12, .LastKeyAndReset
+      cmp r12, #83      /keyboard S for spliting
+      beq splitTime
+      cmp r12, #65      /keyboard A for stopping
+      beq stop
+      cmp r12, #82      /keyboard R for resetting
+      beq resetTime
+returnfrominput:
+      bl resetClockInterrupt
+      rfe
+stop:
+      mov r1, #stopped
+      str r1, .WriteString
+      MOV R8,#loopwait
+      STR R8,.ClockISR
+loopwait:               /this is a loop waiting for stop
+      ldr r12, .LastKeyAndReset
+      cmp r12, #65
+      beq returnfrominput
+      b loopwait
+resetTime: 
+      mov r1, #reseted
+      str r1, .WriteString
+      b start
+splitTime:
+      PUSH {r0}
+      mov r0, #0
+      str r7, [r10+r0]
+      add r0, r0, #4
+      str r6, [r10+r0]
+      add r0, r0, #4
+      str r5, [r10+r0]
+      add r0, r0, #4
+      str r4, [r10+r0]
+      POP {r0}
+      mov r3, #2264     /offset for drawing pixel for running clock
+      bl drawTime 
+      b loop
+resetSplit:
+      PUSH {r0, r1}
+      mov r0, #0
+      mov r1, #0
+      str r1, [r10+r0]
+      add r0, r0, #4
+      str r1, [r10+r0]
+      add r0, r0, #4
+      str r1, [r10+r0]
+      add r0, r0, #4
+      str r1, [r10+r0]
+      POP {r0, r1}
+      ret
+resetClockInterrupt:
+      MOV R8,#addTime
+      STR R8,.ClockISR
+      ret
